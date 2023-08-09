@@ -5,8 +5,9 @@ using UnityEngine.UI;
 
 public class GameManager : MonoBehaviour
 {
-    private static int[] ENEMIES_COUNT = { 0, 0, 1, 2, 3, 5, 7, 10, 14, 15, 20, 21 };       // кол-во врагов в раунд
-    private static int WINNING_REBELS_AMOUNT = 15;
+    private static int[] ENEMIES_COUNT = { 0, 0, 1, 2, 2, 3, 5, 6, 10, 13, 14, 21 };       // кол-во врагов в раунд
+    private int WIN_USED_LEAFLETS_NUMBER = 75;                                             // минимальное количество распростарненных листовок дл€ победы
+    private int MAX_FIGHT_NUMBER = 10;                                                     // максимальное количство столкновений
 
     [SerializeField] Button AddWarriorButton;                   // кнопка добавить воина
     [SerializeField] Button AddPrinterButton;                   // кнопка добавить полиграфиста
@@ -76,65 +77,32 @@ public class GameManager : MonoBehaviour
             UpdateRebelsStatsAmountText();
             CountLooses();
 
-            // игрок проигрывает, если количество врагов больше, чем количество воинов
             if (WarriorsAmount < 0)
             {
-                Time.timeScale = 0f;
-
-                ResultText.text = "ѕоражение";
-                DescriptionText.text = "¬осстание было подавлено.";
-                StatsText.text = PauseStatsText.text;
-                ResultImage.sprite = LooseSprite;
-
-                ThemeAudioSource.Stop();
-                LostAudioSource.Play();
-
-                ResultPanel.SetActive(true);
-
+                // игрок проигрывает, если количество врагов больше, чем количество воинов
+                LooseGame();
             }
-
-            if (fightsAlive == 10)
+            if (fightsAlive == MAX_FIGHT_NUMBER)
             {
-                if (WarriorsAmount < WINNING_REBELS_AMOUNT)
+                if (usedLeaflets < WIN_USED_LEAFLETS_NUMBER || WarriorsAmount < 1)
                 {
-                    // игрок проигрывает, если к 10 битве его войско не превосходит войско Ћимонов на 15
-                    Time.timeScale = 0f;
-
-                    ResultText.text = "ѕоражение";
-                    DescriptionText.text = "¬осстание было подавлено.";
-                    StatsText.text = PauseStatsText.text;
-                    ResultImage.sprite = LooseSprite;
-
-                    ThemeAudioSource.Stop();
-                    LostAudioSource.Play();
-
-                    ResultPanel.SetActive(true);
+                    // игрок проигрывает, если к 10 битве количество распространенных листовок не превышает WIN_USED_LEAFLETS_NUMBER и
+                    // после финального столкновени€ не остаетс€ ни одного бойца
+                    LooseGame();
                 }
                 else
                 {
-                    // игрок побеждает, если суммарное количество повстанцев равно WINNING_REBELS_AMOUNT и пережито 10 битв
-                    Time.timeScale = 0f;
-
-                    ResultText.text = "ѕобеда";
-                    DescriptionText.text = "ƒа здравствует свобода!";
-                    StatsText.text = PauseStatsText.text;
-                    ResultImage.sprite = WinSprite;
-
-                    ThemeAudioSource.Stop();
-                    WinAudioSource.Play();
-
-                    ResultPanel.SetActive(true);
+                    WinGame();
                 }
             }
             // в любом другом случае игра продолжаетс€
-
             UpdateWarriorTimerIndex();
-
             fightsAlive++;
             enemiesAmount = ENEMIES_COUNT[fightsAlive];
             UpdatePomidoroStatsAmountText();
             UpdateGameStatsAmountText();
         }
+
         // если привлечен полиграфист
         if (PrinterTimer.TaskCompleted)
         {
@@ -173,7 +141,8 @@ public class GameManager : MonoBehaviour
     {
         RebelsStatsAmountText.text =
             $"{WarriorsAmount}\n" +
-            $"{PrintersAmount}\n";
+            $"{PrintersAmount}\n" +
+            $"{usedLeaflets}";
     }
 
     /// <summary>
@@ -194,6 +163,7 @@ public class GameManager : MonoBehaviour
         if (!WarriorTimer.Works && LeafletsAmount > 0)
         {
             usedLeaflets++;
+            UpdateRebelsStatsAmountText();
             LeafletsAmount--;
             UpdateGameStatsAmountText();
             WarriorTimer.Works = true;
@@ -209,6 +179,7 @@ public class GameManager : MonoBehaviour
         if (!PrinterTimer.Works && LeafletsAmount > 0)
         {
             usedLeaflets++;
+            UpdateRebelsStatsAmountText();
             LeafletsAmount--;
             UpdateGameStatsAmountText();
             PrinterTimer.Works = true;
@@ -267,21 +238,24 @@ public class GameManager : MonoBehaviour
 
         if (LeafletsAmount != 0)
         {
-            LeafletsAmount -= detectivesAmount * 2;
+            LeafletsAmount -= detectivesAmount;
             if (LeafletsAmount < 0)
             {
                 LeafletsAmount = 0;
             }
 
-            detectivesAmount += 2;
+            detectivesAmount += 3;
         }
     }
 
+    /// <summary>
+    /// –ассчитывает и обновл€ет индекс скорости генерации воинов
+    /// </summary>
     private void UpdateWarriorTimerIndex()
     {
         if (WarriorsAmount != 0)
         {
-            warriorTimerIndex = (float)(1 + Math.Pow(WarriorsAmount - 1, 0.5f) / 2f);
+            warriorTimerIndex = (float)(1 + Math.Pow(WarriorsAmount - 1, 0.5f) / 3f);
         }
         else
         {
@@ -289,5 +263,41 @@ public class GameManager : MonoBehaviour
         }
         WarriorTimer.UpdateSpeedIndex(warriorTimerIndex);
         
+    }
+
+    /// <summary>
+    /// ѕобеда игрока
+    /// </summary>
+    private void WinGame()
+    {
+        ResultText.text = "ѕобеда";
+        DescriptionText.text = "ƒа здравствует свобода!";
+        ResultImage.sprite = WinSprite;
+        EndGame();
+        WinAudioSource.Play();
+
+    }
+
+    /// <summary>
+    /// ѕроигрыш игрока
+    /// </summary>
+    private void LooseGame()
+    {
+        ResultText.text = "ѕоражение";
+        DescriptionText.text = "¬осстание было подавлено.";
+        ResultImage.sprite = LooseSprite;
+        EndGame();
+        LostAudioSource.Play();
+    }
+
+    /// <summary>
+    /// «авершение игры
+    /// </summary>
+    private void EndGame()
+    {
+        Time.timeScale = 0f;
+        StatsText.text = PauseStatsText.text;
+        ThemeAudioSource.Stop();
+        ResultPanel.SetActive(true);
     }
 }
